@@ -1,18 +1,17 @@
-################################################################################
 """pygametextbox Module Description
 A module to implement an editable text entry box for the pygame module.
 Requires use of the pygame module.
 pygame.MOUSEBUTTONUP and pygame.KEYDOWN events must be enabled.
 """
+
 # if __name__ == "__main__":
-#     print("pygametextbox module is not intended to run solitary.")
+#     print("The pygametextbox module is not designed to be run on its own.")
 #     exit()
 
 
 # Imports
 from __future__ import annotations
 import pygame as pg
-import sys
 import typing
 from pyperclip import copy, paste
 
