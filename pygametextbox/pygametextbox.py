@@ -11,64 +11,60 @@ pygame.MOUSEBUTTONUP and pygame.KEYDOWN events must be enabled.
 
 # Imports
 from __future__ import annotations
-import pygame as pg
+import pygame
 import typing
 from pyperclip import copy, paste
 
 
 # Initialization
-if not pg.font.get_init(): pg.font.init()
-
-
-# Finals
-ACCEPTED_CHARS = ("abcdefghijklmnopqrstuvwxyz" +
-                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
-                  "0123456789 _-~")
-DEFAULT_FONT = pg.font.Font()
-GRAY = pg.Color('gray')#127, 127, 127)
-LIGHT_BLUE = pg.Color('light blue')#191, 191, 255)
-LIGHT_GRAY = pg.Color('light gray')#191, 191, 191)
-SOFT_BLACK = pg.Color('gray1')#15, 15, 15)
-SOFT_WHITE = pg.Color('gray15')#239, 239, 239)
+if not pygame.font.get_init(): pygame.font.init()
 
 
 # Classes
 class TextBox:
     """pygametextbox.TextBox Class Description"""
     
-    def __init__(self, rect:pg.Rect, placeholder:str="…", font=DEFAULT_FONT,
-                 colors:list[pg.Color|tuple[int,int,int]]=None):
+    def __init__(self, rect:pygame.Rect, placeholder:str="Enter Text Here...", font=pygame.font.Font(),
+                 colors:list[pygame.Color|tuple[int,int,int]]=None):
         """pygametextbox.TextBox.__init__ Description"""
 
         # Internal property defaults
-        self._action = None
-        self._antialias = True
-        self._cursor_position = 0
-        self._is_selected = False
-        self._margin = 2
-        self._text = ""
+        self._action: typing.Callable[[TextBox], None] = None
+        self._antialias: bool = True
+        self._cursor_position: int = 0
+        self._is_selected: bool = False
+        self._margin: int = 2
+        self._text: str = ""
 
         # Internal property values from arguments
-        self._font = font
-        self._placeholder = placeholder
+        self._font: pygame.font.Font = font
+        self._placeholder: str = placeholder
+        self._rect: pygame.Rect = rect
 
         # Colors
-        self._bg_color = SOFT_WHITE
-        self._inactive_color = LIGHT_GRAY
-        self._placeholder_color = GRAY
-        self._text_color = SOFT_BLACK
+        self._bg_color: pygame.Color = pygame.Color('gray97')
+        self._inactive_color: pygame.Color = pygame.Color('gray90')
+        self._placeholder_color: pygame.Color = pygame.Color('gray50')
+        self._text_color: pygame.Color = pygame.Color('gray3')
 
-        self.rect = rect
-        self._placeholder_render = font.render(self._placeholder, self._antialias, self._placeholder_color)
-        self._is_dirty = True
-        self._letter_surfaces: list[pg.Surface] = []
+        self._letter_surfaces: list[pygame.Surface] = []
         self._prev_text = ""
-        self._surface = pg.Surface(rect.size)
+        self._surface = pygame.Surface(rect.size)
+
+        # Initialization
+        self._rerender_placeholder()
+        self.rerender()
+
+
+
+
+
 
 
 
 
     # Attributes/Properties
+
     @property
     def antialias(self) -> bool:
         """pygametextbox.TextBox.antialias Attribute Description"""
@@ -76,21 +72,27 @@ class TextBox:
 
     @antialias.setter
     def antialias(self, value:bool):
-        self._is_dirty = True
         self._antialias = value
+        self._is_dirty = True
+        self._rerender_placeholder()
     
+
+
 
 
     @property
-    def bg_color(self) -> pg.Color:
+    def bg_color(self) -> pygame.Color:
         """pygametextbox.TextBox.bg_color Attribute Description"""
-        return pg.Color(self._bg_color)
+        return self._bg_color
 
     @bg_color.setter
-    def bg_color(self, value:pg.Color|tuple[int,int,int]|str):
+    def bg_color(self, value:pygame.Color|tuple[int,int,int]|str):
+        if not isinstance(value, pygame.Color): value = pygame.Color(value)
+        self._bg_color = value
         self._is_dirty = True
-        self._bg_color = pg.Color(value)
     
+
+
 
 
     @property
@@ -100,33 +102,40 @@ class TextBox:
 
     @cursor_position.setter
     def cursor_position(self, value:int):
-        self._is_dirty = True
         self._cursor_position = value
+        self._is_dirty = True
     
 
 
+
+
     @property
-    def font(self) -> pg.font.Font:
+    def font(self) -> pygame.font.Font:
         """pygametextbox.TextBox.font Attribute Description"""
-        return self._font #BUG - mutable object - no mudbath
+        return self._font
 
     @font.setter
-    def font(self, value:pg.font.Font):
+    def font(self, value:pygame.font.Font):
+        self._font = value
         self._is_dirty = True
-        self._font = value #BUG - mutable object - no mudbath
     
+
+
 
 
     @property
-    def inactive_color(self) -> pg.Color:
+    def inactive_color(self) -> pygame.Color:
         """pygametextbox.TextBox.inactive_color Attribute Description"""
-        return pg.Color(self._inactive_color)
+        return self._inactive_color
     
     @inactive_color.setter
-    def inactive_color(self, value:pg.Color|tuple[int,int,int]|str):
+    def inactive_color(self, value:pygame.Color|tuple[int,int,int]|str):
+        if not isinstance(value, pygame.Color): value = pygame.Color(value)
+        self._inactive_color = value
         self._is_dirty = True
-        self._inactive_color = pg.Color(value)
     
+
+
 
 
     @property
@@ -136,9 +145,11 @@ class TextBox:
 
     @is_selected.setter
     def is_selected(self, value:bool):
-        self._is_dirty = True
         self._is_selected = value
+        self._is_dirty = True
     
+
+
 
 
     @property
@@ -148,9 +159,11 @@ class TextBox:
 
     @margin.setter
     def margin(self, value:int):
-        self._is_dirty = True
         self._margin = value
+        self._is_dirty = True
     
+
+
 
 
     @property
@@ -160,21 +173,43 @@ class TextBox:
 
     @placeholder.setter
     def placeholder(self, value:str|None):
-        self._is_dirty = True
         self._placeholder = value
+        self._is_dirty = True
+        self._rerender_placeholder()
     
+
+
 
 
     @property
-    def placeholder_color(self) -> pg.Color:
+    def placeholder_color(self) -> pygame.Color:
         """pygametextbox.TextBox.placeholder_color Attribute Description"""
-        return pg.Color(self._placeholder_color)
+        return self._placeholder_color
 
     @placeholder_color.setter
-    def placeholder_color(self, value:pg.Color|tuple[int,int,int]|str):
+    def placeholder_color(self, value:pygame.Color|tuple[int,int,int]|str):
+        if not isinstance(value, pygame.Color): value = pygame.Color(value)
+        self._placeholder_color = value
         self._is_dirty = True
-        self._placeholder_color = pg.Color(value)
+        self._rerender_placeholder()
     
+
+
+
+
+    @property
+    def rect(self) -> pygame.Rect:
+        """pygametextbox.TextBox.rect Attribute Description"""
+        return self._rect
+    
+    @rect.setter
+    def rect(self, value:pygame.Rect|tuple[int,int,int,int]):
+        if not isinstance(value, pygame.Rect): value = pygame.Rect(value)
+        self._rect = value
+        self._is_dirty = True
+    
+
+
 
 
     @property
@@ -184,30 +219,41 @@ class TextBox:
     
     @text.setter
     def text(self, value:str):
-        self._is_dirty = True
         self._text = value
+        self._is_dirty = True
+
+
 
 
 
     @property
-    def text_color(self) -> pg.Color:
+    def text_color(self) -> pygame.Color:
         """pygametextbox.TextBox.text_color Attribute Description"""
-        return pg.Color(self._text_color)
+        return self._text_color
     
     @text_color.setter
-    def text_color(self, value:pg.Color|tuple[int,int,int]|str):
+    def text_color(self, value:pygame.Color|tuple[int,int,int]|str):
+        if not isinstance(value, pygame.Color): value = pygame.Color(value)
+        self._text_color = value
         self._is_dirty = True
-        self._text_color = pg.Color(value)
     
+
+
+
+
+
 
 
 
     # Special getters/setters
-    def get_surface(self) -> pg.Surface:
+
+    def get_surface(self) -> pygame.Surface:
         """pygametextbox.TextBox.get_surface Method Description"""
         if self._is_dirty: self.rerender()
-        return self._surface
+        return self._surface # Possible BUG if Surface is too mutable
     
+
+
 
 
     def set_action(self, action:typing.Callable[[TextBox],None]):
@@ -217,11 +263,35 @@ class TextBox:
 
 
 
+
+
+
+
+
     # Methods
+
+    def _rerender_placeholder(self):
+
+        self._placeholder_render = self._font.render(self._placeholder, self._antialias, self._placeholder_color)
+        self._is_dirty = True
+    
+
+
+
+
+    def drawTo(self, window:pygame.Surface):
+        """pygametextbox.TextBox.draw Method Description"""
+
+        window.blit(self.get_surface(), self._rect)
+    
+
+
+
+
     def rerender(self):
         """pygametextbox.TextBox.rerender Method Description"""
 
-        # Rerender letters if needed
+        # Rerender letters if needed FIXME - Skip unnecesary rerenders
         if self._text != self._prev_text: self._letter_surfaces = renderLetters(self._font, self._text, self._antialias, self._text_color)
         self._prev_text = self._text
         
@@ -239,84 +309,98 @@ class TextBox:
 
         # Draw cursor
         if self._is_selected: #TODO - Make readable
-            pg.draw.rect(self._surface, self._text_color, (self._margin+sum(letter.get_width() for letter in self._letter_surfaces[:self._cursor_position]), self._margin, 2, self._font.get_height()))
+            pygame.draw.rect(self._surface, self._text_color, (self._margin+sum(letter.get_width() for letter in self._letter_surfaces[:self._cursor_position]), self._margin, 2, self._font.get_height()))
     
 
 
-    def update(self, events: list[pg.event.Event]):
+
+
+    def update(self, events: list[pygame.event.Event]):
         """pygametextbox.TextBox.update Method Description"""
 
         # Event Handling
         for event in events:
             match event.type:
               # Keyboard Handling
-              case pg.KEYDOWN:
-                if self.is_selected:
-                    # Command key (Mac)
-                    if event.mod == 1024 or event.mod == 2048:
-                        # Copy
-                        if event.key == pg.K_c: copy(self.text)
-
-                        # Paste
-                        elif event.key == pg.K_v:
-                            self.text = paste()
-                            self.cursor_position = len(self.text)
-                        
-                        # Cut
-                        elif event.key == pg.K_x:
-                            copy(self._text)
-                            self.text = ""
-                            self.cursor_position = 0
-
-                    # Typing key
-                    elif event.unicode and event.unicode in ACCEPTED_CHARS:
-                        self.text = self._text[:self._cursor_position] + event.unicode + self._text[self._cursor_position:]
-                        self.cursor_position+=1
-                    
-                    # Delete/backspace key
-                    elif event.key == pg.K_DELETE or event.key == pg.K_BACKSPACE:
-                        if self._text[:self._cursor_position]:
-                            self.cursor_position-=1
-                            self.text = self._text[:self._cursor_position] + self._text[self._cursor_position+1:]
-                    
-                    # Left/right arrow keys
-                    elif event.key == pg.K_LEFT:
-                        if self._cursor_position > 0: self.cursor_position-=1
-
-                    elif event.key == pg.K_RIGHT:
-                        if self._cursor_position < len(self._text): self.cursor_position+=1
-                    
-                    # Enter/return key
-                    elif event.key == pg.K_RETURN and self._action: self._action(self.text)
-
+              case pygame.KEYDOWN:
+                if self.is_selected: self._keydown_handler(event.key, event.mod, event.unicode)
               # Mouse handling
-              case pg.MOUSEBUTTONUP:
-                if event.button == 1:
-                    #prev_is_selected = self.is_selected TODO
-                    # Check for click on TextBox
-                    if self._rect.collidepoint(event.pos): self.is_selected = True
-                    else: self.is_selected = False
-                    #if prev_is_selected != self.is_selected: self._is_dirty = True
+              case pygame.MOUSEBUTTONUP:
+                if event.button == 1: self._mousebuttonup_handler(event.pos)
 
-                    # Set cursor position
-                    if self._is_selected:
-                        cursor_position = 0
-                        x = event.pos[0] - self.rect.left - self.margin
-                        prev_possible_cursor_position = 0
-                        for possible_cursor_position in [sum(letter_surface.get_width() for letter_surface in self._letter_surfaces[:i])
-                                                         for i in range(1, len(self._letter_surfaces)+1)]:
-                            if abs(x-possible_cursor_position) > abs(x-prev_possible_cursor_position): break
-                            prev_possible_cursor_position = possible_cursor_position
-                            cursor_position+=1
-                        if self.cursor_position != cursor_position: self._is_dirty = True
-                        self.cursor_position = cursor_position
+
+
+    def _keydown_handler(self, key, mod, unicode):
+        
+        # Command key (Mac)
+        if mod == 1024 or mod == 2048: self._control_handler(key)
+        
+        # Left/right arrow keys
+        elif key == pygame.K_LEFT:
+            if self._cursor_position > 0: self.cursor_position-=1
+
+        elif key == pygame.K_RIGHT:
+            if self._cursor_position < len(self._text): self.cursor_position+=1
+        
+        # Enter/return key
+        elif key == pygame.K_RETURN:
+            if self._action: self._action(self.text)
+
+        # Delete/backspace key
+        elif key == pygame.K_DELETE or key == pygame.K_BACKSPACE:
+            if self._text[:self._cursor_position]:
+                self.cursor_position-=1
+                self.text = self._text[:self._cursor_position] + self._text[self._cursor_position+1:]
+        
+        # Typing key
+        elif unicode and key != pygame.K_TAB:
+            self.text = self._text[:self._cursor_position] + unicode + self._text[self._cursor_position:]
+            self.cursor_position+=1
+
+
+
+    def _control_handler(self, key):
+
+        # Copy
+        if key == pygame.K_c: copy(self.text)
+
+        # Paste
+        elif key == pygame.K_v:
+            self.text = paste()
+            self.cursor_position = len(self.text)
+            
+        # Cut
+        elif key == pygame.K_x:
+            copy(self._text)
+            self.text = ""
+            self.cursor_position = 0
+
+
+
+    def _mousebuttonup_handler(self, pos):
+
+        # Check for click on TextBox
+        if self._rect.collidepoint(pos): self.is_selected = True
+        else: self.is_selected = False
+
+        # Set cursor position
+        if self._is_selected:
+            cursor_position = 0
+            x = pos[0] - self._rect.left - self._margin
+            prev_possible_cursor_position = 0
+            for possible_cursor_position in [sum(letter_surface.get_width() for letter_surface in self._letter_surfaces[:i])
+                                             for i in range(1, len(self._letter_surfaces)+1)]:
+                if abs(x-possible_cursor_position) > abs(x-prev_possible_cursor_position): break
+                prev_possible_cursor_position = possible_cursor_position
+                cursor_position+=1
+            self.cursor_position = cursor_position
 
 
 # Functions
-def renderLetters(font:pg.font.Font,
+def renderLetters(font:pygame.font.Font,
                text:str|bytes|None, antialias:bool,
-               color:pg.Color|tuple[int,int,int], background:pg.Color|tuple[int,int,int]|None=None) -> list[pg.Surface]:
-    letters: list[pg.Surface] = []
+               color:pygame.Color|tuple[int,int,int], background:pygame.Color|tuple[int,int,int]|None=None) -> list[pygame.Surface]:
+    letters: list[pygame.Surface] = []
     for letter in text: letters.append(font.render(letter, antialias, color, background))
     return letters
 
@@ -325,40 +409,40 @@ def renderLetters(font:pg.font.Font,
 if __name__ == "__main__":
 
     # Finals - Settings for the project
-    BG_COLOR = pg.Color('tan')
-    FONT = pg.font.SysFont('Comic Sans MS', 24)
+    BG_COLOR = pygame.Color('tan')
+    FONT = pygame.font.SysFont('Comic Sans MS', 24)
     FPS = 30
     HEIGHT = FONT.get_linesize()-FONT.get_descent()
-    WIN = pg.display.set_mode((300, HEIGHT+20))
+    WIN = pygame.display.set_mode((300, HEIGHT+80))
 
     # Variables
-    textbox = TextBox(pg.Rect(10, 10, 280, HEIGHT), font=FONT)
-    clock = pg.time.Clock()
+    textbox = TextBox(pygame.Rect(10, 10, 280, HEIGHT), font=FONT)
+    clock = pygame.time.Clock()
     running = True
 
     # Set up
-    pg.display.set_caption("pygametextbox Demo")
-    pg.event.set_blocked(None)
-    pg.event.set_allowed( (pg.QUIT, pg.KEYDOWN, pg.KEYUP, pg.MOUSEBUTTONUP) )
-    pg.key.set_repeat(300, 100)
+    pygame.display.set_caption("pygametextbox Demo")
+    pygame.event.set_blocked(None)
+    pygame.event.set_allowed( (pygame.QUIT, pygame.KEYDOWN, pygame.KEYUP, pygame.MOUSEBUTTONUP) )
+    pygame.key.set_repeat(300, 100)
 
     # Game loop
     while running:
 
         # Event handling
-        events = pg.event.get()
+        events = pygame.event.get()
         for event in events:
             match event.type:
-              case pg.QUIT: running = False
+              case pygame.QUIT: running = False
 
         textbox.update(events) # Pass events to the textbox.update method every frame
         
         # Draw to the window
         WIN.fill(BG_COLOR)
-        WIN.blit(textbox.surface, textbox.rect)
-        pg.display.flip()
+        textbox.drawTo(WIN)
+        pygame.display.flip()
     
         clock.tick(FPS)
 
-    pg.quit()
+    pygame.quit()
     exit()
